@@ -44,11 +44,14 @@ def render_tool_intro(
     question: str,
     beginner_note: str,
 ) -> None:
-    """Display a consistent beginner-friendly introduction."""
-    with st.container(border=True):
-        st.markdown("#### What this tool answers")
-        st.write(question)
-        st.caption(beginner_note)
+    """Display mode-aware tool guidance."""
+    if experience_level == "Beginner":
+        with st.container(border=True):
+            st.markdown("#### What this tool answers")
+            st.write(question)
+            st.caption(beginner_note)
+    else:
+        st.caption(f"Purpose: {question}")
 
 
 def render_takeaway(
@@ -56,23 +59,35 @@ def render_takeaway(
     meaning: str,
     uncertainty: str,
 ) -> None:
-    """Display a consistent plain-language result summary."""
+    """Display a mode-aware result summary."""
     safe_meaning = meaning.replace("$", r"\$")
     safe_uncertainty = uncertainty.replace("$", r"\$")
 
-    st.markdown("### PositionIQ Takeaway")
+    if experience_level == "Beginner":
+        st.markdown("### PositionIQ Takeaway")
 
-    with st.container(border=True):
-        st.markdown(f"#### {headline}")
-        st.markdown(safe_meaning)
-        st.caption(f"What remains uncertain: {safe_uncertainty}")
+        with st.container(border=True):
+            st.markdown(f"#### {headline}")
+            st.markdown(safe_meaning)
+            st.caption(
+                f"What remains uncertain: {safe_uncertainty}"
+            )
+    else:
+        st.markdown("### Analysis Summary")
+
+        with st.container(border=True):
+            st.markdown(f"**{headline}**")
+            st.markdown(safe_meaning)
+            st.markdown(
+                f"**Primary limitation:** {safe_uncertainty}"
+            )
 
 
 def render_analysis_quality(
     quality: str,
     reasons: list[str],
 ) -> None:
-    """Display an analysis-quality indicator."""
+    """Display a mode-aware analysis-quality indicator."""
     icon_map = {
         "High": "🟢",
         "Medium": "🟡",
@@ -82,7 +97,28 @@ def render_analysis_quality(
     icon = icon_map.get(quality, "⚪")
 
     with st.container(border=True):
-        st.markdown(f"#### {icon} Analysis quality: {quality}")
+        if experience_level == "Beginner":
+            st.markdown(
+                f"#### {icon} How reliable is this estimate? {quality}"
+            )
+            beginner_explanations = {
+                "High": (
+                    "The calculation uses relatively complete market data."
+                ),
+                "Medium": (
+                    "The calculation mixes stronger market data with some "
+                    "listed sportsbook prices or assumptions."
+                ),
+                "Limited": (
+                    "Treat this mainly as a pricing reference rather than a "
+                    "precise probability estimate."
+                ),
+            }
+            st.write(beginner_explanations.get(quality, ""))
+        else:
+            st.markdown(
+                f"#### {icon} Analysis quality: {quality}"
+            )
 
         for reason in reasons:
             st.write(f"• {reason}")
@@ -354,14 +390,28 @@ with st.sidebar:
             """
         )
 
+    if experience_level == "Beginner":
+        st.info(
+            "Beginner mode emphasizes plain-language explanations, common "
+            "mistakes, and practical takeaways."
+        )
+    else:
+        st.info(
+            "Advanced mode uses denser summaries and surfaces technical "
+            "methodology more prominently."
+        )
+
     st.caption(
         "PositionIQ explains prices and trade-offs. It does not guarantee "
         "outcomes or profitability."
     )
 
+advanced_mode = experience_level == "Advanced"
 
-converter_tab, no_vig_tab, hedge_tab, ev_tab, cashout_tab, parlay_tab = st.tabs(
+
+home_tab, converter_tab, no_vig_tab, hedge_tab, ev_tab, cashout_tab, parlay_tab = st.tabs(
     [
+        "Home",
         "Odds Converter",
         "No-Vig Calculator",
         "Hedge Calculator",
@@ -370,6 +420,111 @@ converter_tab, no_vig_tab, hedge_tab, ev_tab, cashout_tab, parlay_tab = st.tabs(
         "Parlay Lab",
     ]
 )
+
+
+
+# =========================================================
+# HOME
+# =========================================================
+
+with home_tab:
+    st.header("Start With the Decision You Are Trying to Make")
+
+    if experience_level == "Beginner":
+        st.write(
+            "Choose the situation that best matches what you are trying to "
+            "understand. PositionIQ will still show the real betting terms, "
+            "but it explains them in plain language."
+        )
+    else:
+        st.write(
+            "Select the relevant pricing, valuation, or risk-management "
+            "workflow."
+        )
+
+    home_col1, home_col2 = st.columns(2)
+
+    with home_col1:
+        with st.container(border=True):
+            st.markdown("### I do not understand the odds")
+            st.write(
+                "Use **Odds Converter** to translate formats and understand "
+                "profit, total return, and implied probability."
+            )
+
+        with st.container(border=True):
+            st.markdown("### I want to know what the market really implies")
+            st.write(
+                "Use **No-Vig Calculator** to remove estimated sportsbook "
+                "margin from a complete two-way or three-way market."
+            )
+
+        with st.container(border=True):
+            st.markdown("### I want to know whether a price has value")
+            st.write(
+                "Use **EV Calculator** to compare a probability estimate "
+                "with the listed break-even probability."
+            )
+
+    with home_col2:
+        with st.container(border=True):
+            st.markdown("### I am considering a hedge")
+            st.write(
+                "Use **Hedge Calculator** to compare possible outcomes before "
+                "and after placing an opposing wager."
+            )
+
+        with st.container(border=True):
+            st.markdown("### I received a cashout offer")
+            st.write(
+                "Use **Cashout Analyzer** to compare the offer with the "
+                "ticket's estimated current value."
+            )
+
+        with st.container(border=True):
+            st.markdown("### I am building or monitoring a parlay")
+            st.write(
+                "Use **Parlay Lab** to reconstruct the ticket by event, "
+                "analyze pricing, compare line movement, value a live ticket, "
+                "or calculate a final-event hedge."
+            )
+
+    st.divider()
+
+    if experience_level == "Beginner":
+        st.subheader("Three ideas to understand first")
+
+        st.markdown(
+            """
+            1. **Odds are prices, not predictions.** A favorite can lose and an
+               underdog can win.
+            2. **Profit and total return are different.** Total return includes
+               the original stake coming back.
+            3. **A better long-term decision can still lose today.** Tools such
+               as EV and no-vig analysis describe pricing over repeated bets.
+            """
+        )
+    else:
+        st.subheader("Methodology at a glance")
+
+        st.markdown(
+            """
+            - Odds conversion uses decimal odds as the internal price format.
+            - No-vig estimates use proportional normalization.
+            - EV depends on an externally supplied probability estimate.
+            - Cashout valuation discounts total payout by remaining win
+              probability.
+            - Parlay event groups are combined under a cross-event
+              independence assumption.
+            - Exact same-game prices retain embedded sportsbook margin unless
+              a complete comparison market is available.
+            """
+        )
+
+    st.warning(
+        "PositionIQ is an educational analytics tool. It does not place bets, "
+        "guarantee outcomes, or replace responsible bankroll limits."
+    )
 
 
 # =========================================================
@@ -1403,6 +1558,18 @@ with ev_tab:
                     key="ev_implied_probability",
                 )
 
+        if experience_level == "Beginner":
+            st.warning(
+                "PositionIQ is not predicting the game here. The probability "
+                "entered below must come from your own model, research, or a "
+                "separate market-based estimate."
+            )
+        else:
+            st.caption(
+                "Probability input is exogenous to PositionIQ and determines "
+                "the EV result."
+            )
+
         with input_col2:
             estimated_probability = st.number_input(
                 "Your estimated win probability (%)",
@@ -1591,7 +1758,7 @@ with ev_tab:
             ),
         )
 
-        with st.expander("How was this calculated?"):
+        with st.expander("How was this calculated?", expanded=advanced_mode):
             st.markdown(
                 f"""
                 **Listed decimal odds:** {ev_decimal_odds:.4f}
@@ -1612,7 +1779,7 @@ with ev_tab:
                 """
             )
 
-        with st.expander("Important limitations"):
+        with st.expander("Important limitations", expanded=advanced_mode):
             st.markdown(
                 """
                 **Your probability estimate drives the result**
@@ -2087,7 +2254,7 @@ with cashout_tab:
             ),
         )
 
-        with st.expander("How was this calculated?"):
+        with st.expander("How was this calculated?", expanded=advanced_mode):
             st.markdown(
                 f"""
                 **Total payout if the ticket wins:** ${total_payout:,.2f}
@@ -2109,7 +2276,7 @@ with cashout_tab:
                 """
             )
 
-        with st.expander("Important limitations"):
+        with st.expander("Important limitations", expanded=advanced_mode):
             st.markdown(
                 """
                 - A fair cashout estimate requires a credible current win
@@ -2835,7 +3002,7 @@ with parlay_tab:
                 ),
             )
 
-            with st.expander("How PositionIQ handled this ticket"):
+            with st.expander("How PositionIQ handled this ticket", expanded=advanced_mode):
                 st.markdown(
                     """
                     - Every event is treated as one event group.
@@ -3690,7 +3857,7 @@ with parlay_tab:
                     """
                 )
 
-            with st.expander("How should an experienced bettor use this?"):
+            with st.expander("How should an experienced bettor use this?", expanded=advanced_mode):
                 st.markdown(
                     f"""
                     **Original decimal price:** {original_line_decimal:.4f}
@@ -3917,6 +4084,6 @@ with parlay_tab:
 
 st.divider()
 st.caption(
-    "PositionIQ v0.10 — Clearer takeaway formatting plus parlay line "
-    "movement and closing-line-value analysis."
+    "PositionIQ v0.11 — Functional Beginner and Advanced modes, a decision-"
+    "based home page, and mode-aware explanations and methodology."
 )
