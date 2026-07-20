@@ -455,3 +455,72 @@ def relative_price_difference_percent(
         * 100
     )
 
+def line_value_metrics(
+    original_decimal_odds: float,
+    current_decimal_odds: float,
+    stake: float,
+) -> dict[str, float]:
+    """
+    Compare an original ticket price with the current price for the exact
+    same ticket.
+
+    Positive price advantage means the bettor locked in a better payout than
+    the currently available market.
+    """
+    validate_decimal(original_decimal_odds)
+    validate_decimal(current_decimal_odds)
+
+    if stake <= 0:
+        raise ValueError("Stake must be greater than 0.")
+
+    original_probability = decimal_to_probability(
+        original_decimal_odds
+    )
+    current_probability = decimal_to_probability(
+        current_decimal_odds
+    )
+
+    probability_point_change = (
+        current_probability - original_probability
+    )
+
+    relative_probability_change = (
+        probability_point_change / original_probability * 100
+    )
+
+    original_total_return = calculate_total_return(
+        stake,
+        original_decimal_odds,
+    )
+    current_total_return = calculate_total_return(
+        stake,
+        current_decimal_odds,
+    )
+
+    original_profit = calculate_profit(
+        stake,
+        original_decimal_odds,
+    )
+    current_profit = calculate_profit(
+        stake,
+        current_decimal_odds,
+    )
+
+    return {
+        "original_probability": original_probability,
+        "current_probability": current_probability,
+        "probability_point_change": probability_point_change,
+        "relative_probability_change": relative_probability_change,
+        "original_total_return": original_total_return,
+        "current_total_return": current_total_return,
+        "original_profit": original_profit,
+        "current_profit": current_profit,
+        "profit_price_advantage": original_profit - current_profit,
+        "total_return_advantage": (
+            original_total_return - current_total_return
+        ),
+        "decimal_price_advantage": (
+            original_decimal_odds - current_decimal_odds
+        ),
+    }
+

@@ -20,6 +20,7 @@ from positioniq_calculations import (
     fractional_to_decimal,
     full_hedge_amount,
     hedge_outcome_profits,
+    line_value_metrics,
     probability_edge,
     parlay_final_leg_equal_profit_hedge,
     parlay_final_leg_outcomes,
@@ -56,12 +57,15 @@ def render_takeaway(
     uncertainty: str,
 ) -> None:
     """Display a consistent plain-language result summary."""
+    safe_meaning = meaning.replace("$", r"\$")
+    safe_uncertainty = uncertainty.replace("$", r"\$")
+
     st.markdown("### PositionIQ Takeaway")
 
     with st.container(border=True):
         st.markdown(f"#### {headline}")
-        st.write(meaning)
-        st.caption(f"What remains uncertain: {uncertainty}")
+        st.markdown(safe_meaning)
+        st.caption(f"What remains uncertain: {safe_uncertainty}")
 
 
 def render_analysis_quality(
@@ -2153,10 +2157,11 @@ with parlay_tab:
         "with its component prices, and evaluate an active ticket."
     )
 
-    builder_tab, live_tab, final_leg_tab = st.tabs(
+    builder_tab, live_tab, line_movement_tab, final_leg_tab = st.tabs(
         [
             "Ticket Builder",
             "Live Ticket & Cashout",
+            "Line Movement / CLV",
             "Final-Leg Hedge",
         ]
     )
@@ -3403,6 +3408,322 @@ with parlay_tab:
         except ValueError as error:
             st.error(str(error))
 
+
+    # -----------------------------------------------------
+    # LINE MOVEMENT / CLV
+    # -----------------------------------------------------
+
+    with line_movement_tab:
+        st.subheader("Parlay Line Movement and CLV")
+
+        render_tool_intro(
+            "Did I lock in a better or worse price than the market offers now?",
+            "Compare the exact same ticket at two different times. The ticket "
+            "must contain the same selections, lines, settlement rules, and "
+            "boost status for the comparison to be meaningful.",
+        )
+
+        st.info(
+            "When a ticket moves from a larger positive price to a smaller "
+            "positive price—such as +7500 to +6000—the market is treating the "
+            "ticket as more likely to win. The original ticket keeps its "
+            "better payout."
+        )
+
+        comparison_format = st.selectbox(
+            "Odds format",
+            [
+                "American",
+                "Decimal",
+                "Fractional",
+                "Implied probability",
+            ],
+            key="clv_odds_format",
+        )
+
+        try:
+            clv_col1, clv_col2 = st.columns(2)
+
+            if comparison_format == "American":
+                with clv_col1:
+                    original_line_input = st.number_input(
+                        "Original ticket odds",
+                        value=7500,
+                        step=50,
+                        key="clv_original_american",
+                    )
+
+                with clv_col2:
+                    current_line_input = st.number_input(
+                        "Current odds for the exact same ticket",
+                        value=6000,
+                        step=50,
+                        key="clv_current_american",
+                    )
+
+            elif comparison_format == "Decimal":
+                with clv_col1:
+                    original_line_input = st.number_input(
+                        "Original ticket decimal odds",
+                        min_value=1.01,
+                        value=76.00,
+                        step=0.10,
+                        format="%.2f",
+                        key="clv_original_decimal",
+                    )
+
+                with clv_col2:
+                    current_line_input = st.number_input(
+                        "Current exact-ticket decimal odds",
+                        min_value=1.01,
+                        value=61.00,
+                        step=0.10,
+                        format="%.2f",
+                        key="clv_current_decimal",
+                    )
+
+            elif comparison_format == "Fractional":
+                with clv_col1:
+                    original_line_input = st.text_input(
+                        "Original ticket fractional odds",
+                        value="75/1",
+                        key="clv_original_fractional",
+                    )
+
+                with clv_col2:
+                    current_line_input = st.text_input(
+                        "Current exact-ticket fractional odds",
+                        value="60/1",
+                        key="clv_current_fractional",
+                    )
+
+            else:
+                with clv_col1:
+                    original_line_input = st.number_input(
+                        "Original implied probability (%)",
+                        min_value=0.01,
+                        max_value=99.99,
+                        value=1.32,
+                        step=0.01,
+                        format="%.2f",
+                        key="clv_original_probability",
+                    )
+
+                with clv_col2:
+                    current_line_input = st.number_input(
+                        "Current implied probability (%)",
+                        min_value=0.01,
+                        max_value=99.99,
+                        value=1.64,
+                        step=0.01,
+                        format="%.2f",
+                        key="clv_current_probability",
+                    )
+
+            clv_stake = st.number_input(
+                "Original stake ($)",
+                min_value=0.01,
+                value=100.00,
+                step=10.00,
+                format="%.2f",
+                key="clv_stake",
+            )
+
+            original_line_decimal = convert_input_to_decimal(
+                comparison_format,
+                original_line_input,
+            )
+            current_line_decimal = convert_input_to_decimal(
+                comparison_format,
+                current_line_input,
+            )
+
+            clv_results = line_value_metrics(
+                original_line_decimal,
+                current_line_decimal,
+                clv_stake,
+            )
+
+            original_american = decimal_to_american(
+                original_line_decimal
+            )
+            current_american = decimal_to_american(
+                current_line_decimal
+            )
+
+            movement_favorable = (
+                original_line_decimal > current_line_decimal
+            )
+            movement_unfavorable = (
+                original_line_decimal < current_line_decimal
+            )
+
+            st.divider()
+            st.subheader("Price Movement")
+
+            price_col1, price_col2, price_col3 = st.columns(3)
+
+            price_col1.metric(
+                "Original price",
+                f"{original_american:+.0f}",
+            )
+            price_col2.metric(
+                "Current exact-ticket price",
+                f"{current_american:+.0f}",
+            )
+            price_col3.metric(
+                "Profit price advantage",
+                f"${clv_results['profit_price_advantage']:+,.2f}",
+                help=(
+                    "How much more or less profit the original ticket pays "
+                    "than a wager of the same stake placed at the current "
+                    "price."
+                ),
+            )
+
+            probability_col1, probability_col2, probability_col3 = (
+                st.columns(3)
+            )
+
+            probability_col1.metric(
+                "Original implied probability",
+                f"{clv_results['original_probability']:.2f}%",
+            )
+            probability_col2.metric(
+                "Current implied probability",
+                f"{clv_results['current_probability']:.2f}%",
+            )
+            probability_col3.metric(
+                "Market-implied change",
+                (
+                    f"{clv_results['probability_point_change']:+.2f} pts"
+                ),
+            )
+
+            return_col1, return_col2, return_col3 = st.columns(3)
+
+            return_col1.metric(
+                "Original potential profit",
+                f"${clv_results['original_profit']:,.2f}",
+            )
+            return_col2.metric(
+                "Profit at current price",
+                f"${clv_results['current_profit']:,.2f}",
+            )
+            return_col3.metric(
+                "Relative probability change",
+                (
+                    f"{clv_results['relative_probability_change']:+.2f}%"
+                ),
+            )
+
+            if movement_favorable:
+                st.success(
+                    "The ticket moved in your favor. You locked in a larger "
+                    "payout than the market offers now for the exact same "
+                    "ticket."
+                )
+            elif movement_unfavorable:
+                st.warning(
+                    "The ticket moved against your entry. The market now "
+                    "offers a larger payout for the exact same ticket."
+                )
+            else:
+                st.info(
+                    "The ticket price has not materially changed."
+                )
+
+            if movement_favorable:
+                takeaway_headline = (
+                    "You captured positive line value."
+                )
+                takeaway_meaning = (
+                    f"You locked in {original_american:+.0f} before the same "
+                    f"ticket moved to {current_american:+.0f}. On a "
+                    f"${clv_stake:,.2f} stake, your ticket pays "
+                    f"${clv_results['profit_price_advantage']:,.2f} more "
+                    f"profit than the currently available price."
+                )
+            elif movement_unfavorable:
+                takeaway_headline = (
+                    "The market moved against your entry."
+                )
+                takeaway_meaning = (
+                    f"You entered at {original_american:+.0f}, while the same "
+                    f"ticket is now available at {current_american:+.0f}. A "
+                    f"${clv_stake:,.2f} wager placed now would pay "
+                    f"${abs(clv_results['profit_price_advantage']):,.2f} more "
+                    f"profit."
+                )
+            else:
+                takeaway_headline = (
+                    "The market price is essentially unchanged."
+                )
+                takeaway_meaning = (
+                    "The original and current ticket prices imply nearly the "
+                    "same payout and probability."
+                )
+
+            render_takeaway(
+                takeaway_headline,
+                takeaway_meaning,
+                (
+                    "Line movement shows how the market repriced the ticket; "
+                    "it does not prove the original wager was positive EV or "
+                    "that the ticket will win."
+                ),
+            )
+
+            with st.expander("What can cause a parlay price to move?"):
+                st.markdown(
+                    """
+                    - Injury, lineup, or availability news
+                    - Earlier results changing tournament or playoff paths
+                    - Movement in one or more individual component markets
+                    - Changes to same-game correlation adjustments
+                    - Sportsbook liability or exposure
+                    - Removal or addition of boosts and promotions
+                    - Different settlement rules or altered selection lines
+
+                    For a valid comparison, the original and current ticket
+                    must be identical.
+                    """
+                )
+
+            with st.expander("How should an experienced bettor use this?"):
+                st.markdown(
+                    f"""
+                    **Original decimal price:** {original_line_decimal:.4f}
+
+                    **Current decimal price:** {current_line_decimal:.4f}
+
+                    **Original implied probability:**
+                    {clv_results['original_probability']:.4f}%
+
+                    **Current implied probability:**
+                    {clv_results['current_probability']:.4f}%
+
+                    **Probability-point movement:**
+                    {clv_results['probability_point_change']:+.4f}
+
+                    **Relative probability movement:**
+                    {clv_results['relative_probability_change']:+.2f}%
+
+                    Positive line value is generally desirable because the
+                    original ticket pays more than the current market price.
+                    For parlays, identifying which event group caused the
+                    movement requires comparing current component prices.
+                    """
+                )
+
+            st.caption(
+                "This compares market prices only. It does not estimate the "
+                "ticket's true probability or predict the outcome."
+            )
+
+        except ValueError as error:
+            st.error(str(error))
+
     # -----------------------------------------------------
     # FINAL-LEG HEDGE
     # -----------------------------------------------------
@@ -3596,6 +3917,6 @@ with parlay_tab:
 
 st.divider()
 st.caption(
-    "PositionIQ v0.9 — Beginner guidance, advanced methodology, analysis "
-    "quality ratings, sensitivity analysis, and clearer takeaways."
+    "PositionIQ v0.10 — Clearer takeaway formatting plus parlay line "
+    "movement and closing-line-value analysis."
 )
