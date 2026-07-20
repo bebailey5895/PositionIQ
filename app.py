@@ -41,6 +41,132 @@ st.set_page_config(
 )
 
 
+st.markdown(
+    """
+    <style>
+    .block-container {
+        max-width: 1180px;
+        padding-top: 2rem;
+        padding-bottom: 4rem;
+    }
+
+    [data-testid="stMetric"] {
+        border: 1px solid rgba(130, 140, 160, 0.28);
+        border-radius: 14px;
+        padding: 0.9rem;
+        background: rgba(255, 255, 255, 0.025);
+    }
+
+    [data-testid="stMetricLabel"] {
+        font-size: 0.86rem;
+    }
+
+    [data-testid="stMetricValue"] {
+        font-size: 1.45rem;
+    }
+
+    .pi-hero {
+        border: 1px solid rgba(130, 140, 160, 0.28);
+        border-radius: 20px;
+        padding: 2rem;
+        margin-bottom: 1.25rem;
+        background: linear-gradient(
+            135deg,
+            rgba(60, 88, 255, 0.12),
+            rgba(80, 200, 170, 0.06)
+        );
+    }
+
+    .pi-kicker {
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.78rem;
+        opacity: 0.75;
+        margin-bottom: 0.4rem;
+    }
+
+    .pi-hero h1 {
+        margin: 0;
+        font-size: 2.35rem;
+        line-height: 1.1;
+    }
+
+    .pi-hero p {
+        margin-top: 0.8rem;
+        margin-bottom: 0;
+        font-size: 1.05rem;
+        opacity: 0.88;
+        max-width: 780px;
+    }
+
+    .pi-card {
+        border: 1px solid rgba(130, 140, 160, 0.28);
+        border-radius: 16px;
+        padding: 1.15rem;
+        min-height: 190px;
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .pi-card h3 {
+        margin: 0.4rem 0 0.55rem 0;
+        font-size: 1.2rem;
+        line-height: 1.25;
+    }
+
+    .pi-card p {
+        margin: 0;
+        opacity: 0.82;
+        line-height: 1.5;
+    }
+
+    .pi-card .pi-icon {
+        font-size: 1.6rem;
+    }
+
+    .pi-section-label {
+        margin-top: 1rem;
+        margin-bottom: 0.6rem;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.11em;
+        opacity: 0.7;
+    }
+
+    @media (max-width: 760px) {
+        .block-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        .pi-hero {
+            padding: 1.35rem;
+        }
+
+        .pi-hero h1 {
+            font-size: 1.8rem;
+        }
+
+        .pi-card {
+            min-height: auto;
+        }
+
+        [data-testid="stHorizontalBlock"] {
+            gap: 0.75rem;
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+
+
+def reset_keys(keys: list[str]) -> None:
+    """Remove selected widget values from session state."""
+    for key in keys:
+        st.session_state.pop(key, None)
+    st.rerun()
 
 def render_tool_intro(
     question: str,
@@ -434,102 +560,154 @@ home_tab, converter_tab, no_vig_tab, hedge_tab, ev_tab, cashout_tab, parlay_tab 
 # =========================================================
 
 with home_tab:
-    st.header("Start With the Decision You Are Trying to Make")
+    st.markdown(
+        """
+        <div class="pi-hero">
+            <div class="pi-kicker">Sports betting decision tools</div>
+            <h1>Understand the price, risk, and trade-off before you act.</h1>
+            <p>
+                PositionIQ turns sportsbook odds, parlays, hedges, cashouts,
+                and line movement into explanations that make sense for both
+                new and experienced bettors.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    if experience_level == "Beginner":
-        st.write(
-            "Choose the situation that best matches what you are trying to "
-            "understand. PositionIQ will still show the real betting terms, "
-            "but it explains them in plain language."
+    st.markdown(
+        '<div class="pi-section-label">Choose your situation</div>',
+        unsafe_allow_html=True,
+    )
+
+    row1_col1, row1_col2, row1_col3 = st.columns(3)
+
+    with row1_col1:
+        st.markdown(
+            """
+            <div class="pi-card">
+                <div class="pi-icon">🔄</div>
+                <h3>Understand the odds</h3>
+                <p>Translate odds formats and see profit, total return, and
+                break-even probability.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-    else:
-        st.write(
-            "Select the relevant pricing, valuation, or risk-management "
-            "workflow."
+        st.caption("Use: Odds Converter")
+
+    with row1_col2:
+        st.markdown(
+            """
+            <div class="pi-card">
+                <div class="pi-icon">⚖️</div>
+                <h3>Estimate the market probability</h3>
+                <p>Remove the sportsbook's estimated margin from a complete
+                two-way or three-way market.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
+        st.caption("Use: No-Vig Calculator")
 
-    home_col1, home_col2 = st.columns(2)
+    with row1_col3:
+        st.markdown(
+            """
+            <div class="pi-card">
+                <div class="pi-icon">📈</div>
+                <h3>Evaluate a price</h3>
+                <p>Compare the listed break-even probability with an
+                independent probability estimate.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption("Use: EV Calculator")
 
-    with home_col1:
-        with st.container(border=True):
-            st.markdown("### I do not understand the odds")
-            st.write(
-                "Use **Odds Converter** to translate formats and understand "
-                "profit, total return, and implied probability."
-            )
+    row2_col1, row2_col2, row2_col3 = st.columns(3)
 
-        with st.container(border=True):
-            st.markdown("### I want to know what the market really implies")
-            st.write(
-                "Use **No-Vig Calculator** to remove estimated sportsbook "
-                "margin from a complete two-way or three-way market."
-            )
+    with row2_col1:
+        st.markdown(
+            """
+            <div class="pi-card">
+                <div class="pi-icon">🛡️</div>
+                <h3>Plan a hedge</h3>
+                <p>See how a second wager changes upside, downside, and the
+                worst possible outcome.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption("Use: Hedge Calculator")
 
-        with st.container(border=True):
-            st.markdown("### I want to know whether a price has value")
-            st.write(
-                "Use **EV Calculator** to compare a probability estimate "
-                "with the listed break-even probability."
-            )
+    with row2_col2:
+        st.markdown(
+            """
+            <div class="pi-card">
+                <div class="pi-icon">💵</div>
+                <h3>Review a cashout offer</h3>
+                <p>Compare guaranteed cash with the estimated current value
+                and remaining upside of the ticket.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption("Use: Cashout Analyzer")
 
-    with home_col2:
-        with st.container(border=True):
-            st.markdown("### I am considering a hedge")
-            st.write(
-                "Use **Hedge Calculator** to compare possible outcomes before "
-                "and after placing an opposing wager."
-            )
-
-        with st.container(border=True):
-            st.markdown("### I received a cashout offer")
-            st.write(
-                "Use **Cashout Analyzer** to compare the offer with the "
-                "ticket's estimated current value."
-            )
-
-        with st.container(border=True):
-            st.markdown("### I am building or monitoring a parlay")
-            st.write(
-                "Use **Parlay Lab** to reconstruct the ticket by event, "
-                "analyze pricing, compare line movement, value a live ticket, "
-                "or calculate a final-event hedge."
-            )
+    with row2_col3:
+        st.markdown(
+            """
+            <div class="pi-card">
+                <div class="pi-icon">🧩</div>
+                <h3>Build or monitor a parlay</h3>
+                <p>Reconstruct the ticket by event, compare component prices,
+                monitor line movement, and plan a final-event hedge.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption("Use: Parlay Lab")
 
     st.divider()
 
-    if experience_level == "Beginner":
-        st.subheader("Three ideas to understand first")
+    info_col1, info_col2 = st.columns(2)
 
+    with info_col1:
+        if experience_level == "Beginner":
+            st.subheader("Three ideas to understand first")
+            st.markdown(
+                """
+                1. **Odds are prices, not predictions.**
+                2. **Profit and total return are different.**
+                3. **A better long-term decision can still lose today.**
+                """
+            )
+        else:
+            st.subheader("Methodology at a glance")
+            st.markdown(
+                """
+                - Decimal odds are the internal price format.
+                - No-vig estimates use proportional normalization.
+                - Cashout valuation uses remaining win probability.
+                - Separate parlay events are assumed independent.
+                - Exact SGP prices can retain embedded sportsbook margin.
+                """
+            )
+
+    with info_col2:
+        st.subheader("What PositionIQ does not do")
         st.markdown(
             """
-            1. **Odds are prices, not predictions.** A favorite can lose and an
-               underdog can win.
-            2. **Profit and total return are different.** Total return includes
-               the original stake coming back.
-            3. **A better long-term decision can still lose today.** Tools such
-               as EV and no-vig analysis describe pricing over repeated bets.
-            """
-        )
-    else:
-        st.subheader("Methodology at a glance")
-
-        st.markdown(
-            """
-            - Odds conversion uses decimal odds as the internal price format.
-            - No-vig estimates use proportional normalization.
-            - EV depends on an externally supplied probability estimate.
-            - Cashout valuation discounts total payout by remaining win
-              probability.
-            - Parlay event groups are combined under a cross-event
-              independence assumption.
-            - Exact same-game prices retain embedded sportsbook margin unless
-              a complete comparison market is available.
+            - It does not guarantee outcomes.
+            - It does not create a probability model for every market.
+            - It does not place bets or access sportsbook accounts.
+            - It does not replace bankroll limits or responsible gambling.
             """
         )
 
-    st.warning(
-        "PositionIQ is an educational analytics tool. It does not place bets, "
-        "guarantee outcomes, or replace responsible bankroll limits."
+    st.info(
+        "Start with the tool matching your decision, then use the glossary "
+        "and PositionIQ Takeaway boxes to interpret the result."
     )
 
 
@@ -545,6 +723,36 @@ with converter_tab:
         "Use this first when American, decimal, fractional, or probability "
         "formats are unfamiliar.",
     )
+
+
+    example_col1, example_col2, reset_col = st.columns(3)
+
+    with example_col1:
+        if st.button("Load +150 example", key="converter_example_plus"):
+            st.session_state["converter_format"] = "American"
+            st.session_state["converter_american"] = 150
+            st.session_state["converter_stake"] = 100.00
+            st.rerun()
+
+    with example_col2:
+        if st.button("Load -150 example", key="converter_example_minus"):
+            st.session_state["converter_format"] = "American"
+            st.session_state["converter_american"] = -150
+            st.session_state["converter_stake"] = 100.00
+            st.rerun()
+
+    with reset_col:
+        if st.button("Reset converter", key="reset_converter"):
+            reset_keys(
+                [
+                    "converter_format",
+                    "converter_american",
+                    "converter_decimal",
+                    "converter_fractional",
+                    "converter_probability",
+                    "converter_stake",
+                ]
+            )
 
     odds_format = st.selectbox(
         "Input format",
@@ -1120,6 +1328,39 @@ with hedge_tab:
         "create value automatically.",
     )
 
+
+    example_col1, example_col2 = st.columns(2)
+
+    with example_col1:
+        if st.button("Load equal-profit example", key="hedge_example"):
+            st.session_state["hedge_format"] = "American"
+            st.session_state["hedge_original_stake"] = 100.00
+            st.session_state["hedge_original_american"] = 120
+            st.session_state["hedge_opposing_american"] = -110
+            st.session_state["hedge_strategy"] = (
+                "Lock in the same profit either way"
+            )
+            st.rerun()
+
+    with example_col2:
+        if st.button("Reset hedge tool", key="reset_hedge"):
+            reset_keys(
+                [
+                    "hedge_format",
+                    "hedge_original_stake",
+                    "hedge_original_american",
+                    "hedge_opposing_american",
+                    "hedge_original_decimal",
+                    "hedge_opposing_decimal",
+                    "hedge_original_fractional",
+                    "hedge_opposing_fractional",
+                    "hedge_original_probability",
+                    "hedge_opposing_probability",
+                    "hedge_strategy",
+                    "hedge_custom_amount",
+                ]
+            )
+
     st.info(
         "Hedging means placing a second wager on the opposing outcome to "
         "reduce risk. It can lock in profit, recover your original stake, "
@@ -1486,6 +1727,39 @@ with ev_tab:
         "result does not mean this specific wager will win.",
     )
 
+
+    example_col1, example_col2, reset_col = st.columns(3)
+
+    with example_col1:
+        if st.button("Load positive-EV example", key="ev_example_positive"):
+            st.session_state["ev_format"] = "American"
+            st.session_state["ev_american"] = 150
+            st.session_state["ev_user_probability"] = 45.00
+            st.session_state["ev_stake"] = 100.00
+            st.rerun()
+
+    with example_col2:
+        if st.button("Load break-even example", key="ev_example_even"):
+            st.session_state["ev_format"] = "American"
+            st.session_state["ev_american"] = -110
+            st.session_state["ev_user_probability"] = 52.38
+            st.session_state["ev_stake"] = 100.00
+            st.rerun()
+
+    with reset_col:
+        if st.button("Reset EV tool", key="reset_ev"):
+            reset_keys(
+                [
+                    "ev_format",
+                    "ev_american",
+                    "ev_decimal",
+                    "ev_fractional",
+                    "ev_implied_probability",
+                    "ev_user_probability",
+                    "ev_stake",
+                ]
+            )
+
     st.info(
         "Expected value estimates the average profit or loss you would expect "
         "if the same wager could be repeated many times under the same odds "
@@ -1839,6 +2113,31 @@ with cashout_tab:
         "This compares expected value and certainty. It does not make the "
         "risk decision for the user.",
     )
+
+
+    example_col1, example_col2 = st.columns(2)
+
+    with example_col1:
+        if st.button("Load cashout example", key="cashout_example"):
+            st.session_state["cashout_original_format"] = "American"
+            st.session_state["cashout_original_stake"] = 100.00
+            st.session_state["cashout_offer"] = 180.00
+            st.session_state["cashout_original_american"] = 200
+            st.session_state["cashout_probability_method"] = (
+                "Enter my own probability"
+            )
+            st.session_state["cashout_manual_probability"] = 65.00
+            st.rerun()
+
+    with example_col2:
+        if st.button("Reset cashout tool", key="reset_cashout"):
+            reset_keys(
+                [
+                    key
+                    for key in list(st.session_state.keys())
+                    if key.startswith("cashout_")
+                ]
+            )
 
     st.info(
         "A cashout offer should be compared with the ticket's estimated "
@@ -2471,6 +2770,13 @@ with parlay_tab:
                 offered_ticket_input,
             )
 
+
+            if parlay_stake > 10000:
+                st.warning(
+                    "This is an unusually large stake. Confirm that the "
+                    "amount was entered correctly."
+                )
+
             event_rows = []
             event_group_decimals = []
             event_group_probabilities = []
@@ -2990,6 +3296,81 @@ with parlay_tab:
                 f"necessarily the worst-priced group."
             )
 
+
+            if int(event_count) > 1:
+                st.markdown("### Remove-One-Event Comparison")
+                st.caption(
+                    "See how the component-based price and total return change "
+                    "when each event group is removed."
+                )
+
+                removal_rows = []
+
+                for remove_index, event_row in enumerate(event_rows):
+                    remaining_decimals = [
+                        decimal_value
+                        for index, decimal_value in enumerate(
+                            event_group_decimals
+                        )
+                        if index != remove_index
+                    ]
+
+                    revised_decimal = combine_decimal_odds(
+                        remaining_decimals
+                    )
+                    revised_probability = decimal_to_probability(
+                        revised_decimal
+                    )
+                    revised_return = calculate_total_return(
+                        parlay_stake,
+                        revised_decimal,
+                    )
+
+                    removal_rows.append(
+                        {
+                            "Remove event": event_row["Event"],
+                            "Revised component odds": (
+                                f"{decimal_to_american(revised_decimal):+.0f}"
+                            ),
+                            "Revised implied probability": (
+                                revised_probability
+                            ),
+                            "Revised total return": revised_return,
+                            "Return reduction": (
+                                synthetic_total_return - revised_return
+                            ),
+                        }
+                    )
+
+                st.dataframe(
+                    removal_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Revised implied probability": (
+                            st.column_config.NumberColumn(
+                                format="%.2f%%"
+                            )
+                        ),
+                        "Revised total return": (
+                            st.column_config.NumberColumn(
+                                format="$%.2f"
+                            )
+                        ),
+                        "Return reduction": (
+                            st.column_config.NumberColumn(
+                                format="$%.2f"
+                            )
+                        ),
+                    },
+                )
+
+                if experience_level == "Beginner":
+                    st.caption(
+                        "Removing an event usually lowers the payout but "
+                        "raises the chance that every remaining event wins."
+                    )
+
             if fair_probability_count < int(event_count):
                 st.warning(
                     "At least one event group uses listed or same-game "
@@ -3053,6 +3434,20 @@ with parlay_tab:
                     "margin, and separate events are assumed independent."
                 ),
             )
+
+            share_summary = (
+                f"PositionIQ Parlay Analysis\n"
+                f"Ticket: {ticket_name}\n"
+                f"Offered odds: "
+                f"{decimal_to_american(offered_ticket_decimal):+.0f}\n"
+                f"Component-based odds: {synthetic_american:+.0f}\n"
+                f"Payout difference: ${payout_difference:+,.2f}\n"
+                f"Events: {int(event_count)} | "
+                f"Selections: {int(total_selections)}"
+            )
+
+            with st.expander("Shareable analysis summary"):
+                st.code(share_summary, language=None)
 
             workspace_payload = {
                 "ticket_name": ticket_name,
@@ -4243,6 +4638,6 @@ with parlay_tab:
 
 st.divider()
 st.caption(
-    "PositionIQ v0.12 — Shared Parlay Workspace, ticket export, and "
-    "cross-tool prefilling for live valuation, CLV, and hedge analysis."
+    "PositionIQ v0.13 — Uniform responsive home design, presets, reset "
+    "controls, parlay comparison tools, share summaries, and tests."
 )
