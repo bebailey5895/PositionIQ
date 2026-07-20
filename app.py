@@ -38,6 +38,51 @@ st.set_page_config(
 )
 
 
+
+def render_tool_intro(
+    question: str,
+    beginner_note: str,
+) -> None:
+    """Display a consistent beginner-friendly introduction."""
+    with st.container(border=True):
+        st.markdown("#### What this tool answers")
+        st.write(question)
+        st.caption(beginner_note)
+
+
+def render_takeaway(
+    headline: str,
+    meaning: str,
+    uncertainty: str,
+) -> None:
+    """Display a consistent plain-language result summary."""
+    st.markdown("### PositionIQ Takeaway")
+
+    with st.container(border=True):
+        st.markdown(f"#### {headline}")
+        st.write(meaning)
+        st.caption(f"What remains uncertain: {uncertainty}")
+
+
+def render_analysis_quality(
+    quality: str,
+    reasons: list[str],
+) -> None:
+    """Display an analysis-quality indicator."""
+    icon_map = {
+        "High": "🟢",
+        "Medium": "🟡",
+        "Limited": "🟠",
+    }
+
+    icon = icon_map.get(quality, "⚪")
+
+    with st.container(border=True):
+        st.markdown(f"#### {icon} Analysis quality: {quality}")
+
+        for reason in reasons:
+            st.write(f"• {reason}")
+
 def get_margin_rating(
     market_margin: float,
 ) -> tuple[str, str, str]:
@@ -229,6 +274,88 @@ def display_market_context(
 st.title("PositionIQ")
 st.caption("Understand every possible outcome.")
 
+
+with st.sidebar:
+    st.header("PositionIQ Guide")
+
+    experience_level = st.radio(
+        "Explanation level",
+        [
+            "Beginner",
+            "Advanced",
+        ],
+        key="global_explanation_level",
+        help=(
+            "Beginner mode emphasizes plain-language explanations. "
+            "Advanced mode keeps the same results while surfacing more "
+            "technical terminology."
+        ),
+    )
+
+    st.divider()
+
+    with st.expander("Sports betting glossary"):
+        st.markdown(
+            """
+            **American odds**  
+            Positive odds show profit on a $100 stake. Negative odds show
+            how much must be risked to make $100.
+
+            **Decimal odds**  
+            Total return per $1 wagered, including the original stake.
+
+            **Implied probability**  
+            The break-even win rate represented by listed odds.
+
+            **Break-even probability**  
+            How often a wager must win to avoid losing money over time.
+
+            **Vig**  
+            The sportsbook's built-in pricing advantage.
+
+            **Overround**  
+            The amount by which all listed implied probabilities exceed 100%.
+
+            **No-vig probability**  
+            A market probability estimate after proportionally removing
+            overround.
+
+            **Expected value (EV)**  
+            Estimated average profit or loss over many comparable wagers.
+
+            **Expected ROI**  
+            Expected value expressed as a percentage of the stake.
+
+            **Hedge**  
+            A second wager that changes the possible profit and loss across
+            outcomes.
+
+            **Cashout**  
+            A sportsbook offer to settle an open ticket early.
+
+            **Parlay**  
+            A ticket that requires every included selection to win.
+
+            **Same-game parlay**  
+            Multiple selections from the same event, which may be correlated.
+
+            **Correlation**  
+            When one selection changes the likelihood of another selection.
+
+            **Net profit**  
+            Money won after subtracting the stake.
+
+            **Total return**  
+            Net profit plus the returned original stake.
+            """
+        )
+
+    st.caption(
+        "PositionIQ explains prices and trade-offs. It does not guarantee "
+        "outcomes or profitability."
+    )
+
+
 converter_tab, no_vig_tab, hedge_tab, ev_tab, cashout_tab, parlay_tab = st.tabs(
     [
         "Odds Converter",
@@ -247,6 +374,12 @@ converter_tab, no_vig_tab, hedge_tab, ev_tab, cashout_tab, parlay_tab = st.tabs(
 
 with converter_tab:
     st.header("Universal Odds Converter")
+
+    render_tool_intro(
+        "What do these odds mean in other formats, and what would the wager pay?",
+        "Use this first when American, decimal, fractional, or probability "
+        "formats are unfamiliar.",
+    )
 
     odds_format = st.selectbox(
         "Input format",
@@ -338,6 +471,24 @@ with converter_tab:
             f"${calculate_total_return(stake, decimal_odds):,.2f}",
         )
 
+
+        if stake > 0:
+            net_profit = calculate_profit(stake, decimal_odds)
+            total_return = calculate_total_return(stake, decimal_odds)
+
+            render_takeaway(
+                "This is the price and payout in plain language.",
+                (
+                    f"A ${stake:,.2f} wager would return ${total_return:,.2f} "
+                    f"in total if it wins: ${net_profit:,.2f} profit plus the "
+                    f"original ${stake:,.2f} stake."
+                ),
+                (
+                    "Odds describe price, not certainty. The wager can still "
+                    "win or lose regardless of the implied probability."
+                ),
+            )
+
     except ValueError as error:
         st.error(str(error))
 
@@ -370,6 +521,13 @@ with converter_tab:
 
 with no_vig_tab:
     st.header("No-Vig Calculator")
+
+    render_tool_intro(
+        "What probability does the market suggest after removing the "
+        "sportsbook's estimated pricing margin?",
+        "The listed probabilities usually total more than 100%. PositionIQ "
+        "scales them back to a 100% market.",
+    )
 
     market_type = st.radio(
         "Market structure",
@@ -762,6 +920,19 @@ with no_vig_tab:
                         f"{fair_decimal:.4f}",
                     )
 
+        render_takeaway(
+            "The market prices include a sportsbook margin.",
+            (
+                f"The listed outcomes total {combined_probability:.2f}%. "
+                f"PositionIQ removes the estimated {market_margin:.2f}% "
+                f"overround so the no-vig probabilities total 100%."
+            ),
+            (
+                "No-vig probabilities reflect market pricing, not a guarantee "
+                "or an independent prediction."
+            ),
+        )
+
         st.caption(
             "PositionIQ uses proportional normalization. Other no-vig "
             "methods may produce slightly different results."
@@ -777,6 +948,12 @@ with no_vig_tab:
 
 with hedge_tab:
     st.header("Two-Outcome Hedge Calculator")
+
+    render_tool_intro(
+        "How would a second wager change my possible profit and loss?",
+        "A hedge reduces risk by giving up some maximum upside. It does not "
+        "create value automatically.",
+    )
 
     st.info(
         "Hedging means placing a second wager on the opposing outcome to "
@@ -1050,6 +1227,34 @@ with hedge_tab:
                 f"${profit_hedge:,.2f}",
             )
 
+        comparison_rows = [
+            {
+                "Outcome": "Original wager wins",
+                "No hedge": original_unhedged_profit,
+                "Selected hedge": profit_original,
+            },
+            {
+                "Outcome": "Opposing outcome wins",
+                "No hedge": -original_stake,
+                "Selected hedge": profit_hedge,
+            },
+        ]
+
+        st.markdown("### Before vs. After")
+        st.dataframe(
+            comparison_rows,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "No hedge": st.column_config.NumberColumn(
+                    format="$%.2f"
+                ),
+                "Selected hedge": st.column_config.NumberColumn(
+                    format="$%.2f"
+                ),
+            },
+        )
+
         if guaranteed_result > 0:
             st.success(
                 f"This setup guarantees at least "
@@ -1064,6 +1269,19 @@ with hedge_tab:
                 f"One outcome still produces a loss of "
                 f"${abs(guaranteed_result):,.2f}."
             )
+
+        render_takeaway(
+            "The hedge exchanges upside for protection.",
+            (
+                f"The selected hedge gives up ${upside_given_up:,.2f} of "
+                f"maximum upside. The worst resulting outcome is "
+                f"${guaranteed_result:,.2f}."
+            ),
+            (
+                "The calculation assumes exactly two mutually exclusive "
+                "outcomes and that both wagers settle normally."
+            ),
+        )
 
         with st.expander("What does this hedge trade off?"):
             st.markdown(
@@ -1096,6 +1314,12 @@ with hedge_tab:
 
 with ev_tab:
     st.header("Expected Value Calculator")
+
+    render_tool_intro(
+        "Does the listed payout justify the probability assigned to this wager?",
+        "The result is only as reliable as the probability entered. A positive "
+        "result does not mean this specific wager will win.",
+    )
 
     st.info(
         "Expected value estimates the average profit or loss you would expect "
@@ -1302,6 +1526,67 @@ with ev_tab:
                 f"${abs(ev_dollars):,.2f} per ${stake:,.2f} wager."
             )
 
+        st.markdown("### Probability Sensitivity")
+
+        sensitivity_probabilities = [
+            max(0.01, estimated_probability - 2),
+            estimated_probability,
+            min(99.99, estimated_probability + 2),
+        ]
+
+        sensitivity_rows = []
+
+        for sensitivity_probability in sensitivity_probabilities:
+            sensitivity_rows.append(
+                {
+                    "Estimated win probability": sensitivity_probability,
+                    "Expected value": expected_value(
+                        stake,
+                        ev_decimal_odds,
+                        sensitivity_probability,
+                    ),
+                    "Expected ROI": expected_value_percent(
+                        ev_decimal_odds,
+                        sensitivity_probability,
+                    ),
+                }
+            )
+
+        st.dataframe(
+            sensitivity_rows,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Estimated win probability": st.column_config.NumberColumn(
+                    format="%.2f%%"
+                ),
+                "Expected value": st.column_config.NumberColumn(
+                    format="$%.2f"
+                ),
+                "Expected ROI": st.column_config.NumberColumn(
+                    format="%.2f%%"
+                ),
+            },
+        )
+
+        render_takeaway(
+            (
+                "The wager appears positive EV."
+                if ev_percent > 0
+                else "The wager appears negative EV."
+            ),
+            (
+                f"At the entered {estimated_probability:.2f}% win estimate, "
+                f"the average modeled result is ${ev_dollars:+,.2f} per "
+                f"${stake:,.2f} wager."
+            ),
+            (
+                "Small probability-estimation errors can erase a narrow edge. "
+                "The sensitivity table shows how the result changes when the "
+                "estimate moves by two percentage points."
+            ),
+        )
+
         with st.expander("How was this calculated?"):
             st.markdown(
                 f"""
@@ -1370,6 +1655,13 @@ with ev_tab:
 
 with cashout_tab:
     st.header("Cashout Analyzer")
+
+    render_tool_intro(
+        "Is the sportsbook's cashout offer above or below the ticket's "
+        "estimated current value?",
+        "This compares expected value and certainty. It does not make the "
+        "risk decision for the user.",
+    )
 
     st.info(
         "A cashout offer should be compared with the ticket's estimated "
@@ -1604,6 +1896,20 @@ with cashout_tab:
             current_win_probability,
         )
 
+
+        if cashout_offer > total_payout:
+            st.warning(
+                "The cashout offer is greater than the ticket's maximum "
+                "payout. Confirm that total payout includes the original "
+                "stake and that the cashout amount was entered correctly."
+            )
+
+        if total_payout < original_cashout_stake:
+            st.warning(
+                "The total payout is below the original stake. Confirm that "
+                "you entered total return rather than net profit."
+            )
+
         break_even_cashout_probability = cashout_break_even_probability(
             cashout_offer,
             total_payout,
@@ -1758,6 +2064,25 @@ with cashout_tab:
                 "cashout break-even threshold."
             )
 
+        render_takeaway(
+            (
+                "The offer is above estimated value."
+                if value_difference >= 0
+                else "The offer is below estimated value."
+            ),
+            (
+                f"The offer is ${abs(value_difference):,.2f} "
+                f"{'above' if value_difference >= 0 else 'below'} the "
+                f"estimated ticket value. Accepting guarantees "
+                f"${cashout_offer:,.2f}; declining keeps "
+                f"${additional_upside:,.2f} of additional possible upside."
+            ),
+            (
+                "The result depends on the current probability estimate and "
+                "does not account for personal risk tolerance."
+            ),
+        )
+
         with st.expander("How was this calculated?"):
             st.markdown(
                 f"""
@@ -1814,6 +2139,13 @@ with cashout_tab:
 
 with parlay_tab:
     st.header("Parlay Lab")
+
+    render_tool_intro(
+        "How is this parlay structured, how does its offered price compare "
+        "with its components, and what is the ticket worth while active?",
+        "Build the ticket by event so same-game groups are not treated as "
+        "independent selections.",
+    )
 
     st.info(
         "Rebuild a parlay by event so PositionIQ can separate standalone "
@@ -2446,6 +2778,57 @@ with parlay_tab:
                     "Every standalone event group was valued with a complete "
                     "market and had its estimated overround removed."
                 )
+
+
+            if fair_probability_count == int(event_count):
+                quality_level = "High"
+                quality_reasons = [
+                    "Every event group used a complete market.",
+                    "Estimated overround was removed from every event group.",
+                    "Separate events were combined under an independence assumption.",
+                ]
+            elif fair_probability_count > 0:
+                quality_level = "Medium"
+                quality_reasons = [
+                    "At least one complete market had estimated vig removed.",
+                    "At least one group still uses a listed or exact SGP price.",
+                    "Separate events were combined under an independence assumption.",
+                ]
+            else:
+                quality_level = "Limited"
+                quality_reasons = [
+                    "The analysis relies on listed or exact SGP prices.",
+                    "Sportsbook margin remains inside at least part of the estimate.",
+                    "The result is a price comparison rather than a true probability model.",
+                ]
+
+            render_analysis_quality(
+                quality_level,
+                quality_reasons,
+            )
+
+            render_takeaway(
+                (
+                    "The offered ticket price is better than its components."
+                    if price_difference_percent > 1
+                    else (
+                        "The offered ticket price is worse than its components."
+                        if price_difference_percent < -1
+                        else "The offered ticket price is close to its components."
+                    )
+                ),
+                (
+                    f"The sportsbook offers "
+                    f"{decimal_to_american(offered_ticket_decimal):+.0f}, "
+                    f"while the entered event groups combine to approximately "
+                    f"{synthetic_american:+.0f}. The resulting total-return "
+                    f"difference is ${payout_difference:+,.2f}."
+                ),
+                (
+                    "Same-game group prices may still include sportsbook "
+                    "margin, and separate events are assumed independent."
+                ),
+            )
 
             with st.expander("How PositionIQ handled this ticket"):
                 st.markdown(
@@ -3213,6 +3596,6 @@ with parlay_tab:
 
 st.divider()
 st.caption(
-    "PositionIQ v0.8 — Event-based parlay construction, pricing analysis, "
-    "live cashout valuation, and final-event hedge analysis."
+    "PositionIQ v0.9 — Beginner guidance, advanced methodology, analysis "
+    "quality ratings, sensitivity analysis, and clearer takeaways."
 )
