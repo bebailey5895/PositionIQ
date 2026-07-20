@@ -1,33 +1,26 @@
-# PositionIQ
+# PositionIQ v1.0
 
-PositionIQ is a sports analytics platform built with Python and Streamlit.
+PositionIQ is a sports-betting analytics application built with Python and
+Streamlit. It provides odds conversion, no-vig analysis, expected-value
+analysis, hedge planning, cashout valuation, and event-based parlay tools.
 
-## Current Features
+## Architecture
 
-- Odds Converter
-    - American
-    - Decimal
-    - Fractional
-    - Implied Probability
+- `app.py` — application router and shared sidebar
+- `positioniq_pages/` — dedicated workflow pages
+- `positioniq_components/ui.py` — reusable interface components
+- `positioniq_calculations.py` — calculation engine
+- `tests/` — automated calculation tests
 
-- Two-Way No-Vig Calculator
-- Market Overround Analysis
-- Fair Odds Estimation
-- Educational Insights
+## Run locally
 
-## Built With
+```powershell
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
 
-- Python
-- Streamlit
-- Git
-- VS Code
+## Test
 
-## Roadmap
-
-- Hedge Calculator
-- Arbitrage Calculator
-- Kelly Criterion Calculator
-- EV Calculator
-- Cashout Analyzer
-
-Built by Beau Bailey.
+```powershell
+python -m pytest -v
+```
