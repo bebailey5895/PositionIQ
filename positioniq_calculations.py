@@ -110,33 +110,111 @@ def remove_vig_two_way(
     """
     Remove vig proportionally from a two-outcome market.
 
-    Returns:
-        fair_probability_a
-        fair_probability_b
-        market_margin
-
+    Returns fair probabilities for A and B, plus market overround.
     All returned values are percentages.
     """
     validate_decimal(decimal_odds_a)
     validate_decimal(decimal_odds_b)
 
-    raw_probability_a = 1 / decimal_odds_a
-    raw_probability_b = 1 / decimal_odds_b
+    raw_a = 1 / decimal_odds_a
+    raw_b = 1 / decimal_odds_b
+    combined = raw_a + raw_b
 
-    combined_probability = raw_probability_a + raw_probability_b
+    fair_a = raw_a / combined * 100
+    fair_b = raw_b / combined * 100
+    overround = (combined - 1) * 100
 
-    fair_probability_a = (
-        raw_probability_a / combined_probability
-    ) * 100
+    return fair_a, fair_b, overround
 
-    fair_probability_b = (
-        raw_probability_b / combined_probability
-    ) * 100
 
-    market_margin = (combined_probability - 1) * 100
+def remove_vig_three_way(
+    decimal_odds_a: float,
+    decimal_odds_draw: float,
+    decimal_odds_b: float,
+) -> tuple[float, float, float, float]:
+    """
+    Remove vig proportionally from a three-outcome market.
 
-    return (
-        fair_probability_a,
-        fair_probability_b,
-        market_margin,
+    Returns fair probabilities for A, draw, and B, plus market overround.
+    All returned values are percentages.
+    """
+    validate_decimal(decimal_odds_a)
+    validate_decimal(decimal_odds_draw)
+    validate_decimal(decimal_odds_b)
+
+    raw_a = 1 / decimal_odds_a
+    raw_draw = 1 / decimal_odds_draw
+    raw_b = 1 / decimal_odds_b
+    combined = raw_a + raw_draw + raw_b
+
+    fair_a = raw_a / combined * 100
+    fair_draw = raw_draw / combined * 100
+    fair_b = raw_b / combined * 100
+    overround = (combined - 1) * 100
+
+    return fair_a, fair_draw, fair_b, overround
+
+
+def full_hedge_amount(
+    original_stake: float,
+    original_decimal_odds: float,
+    hedge_decimal_odds: float,
+) -> float:
+    """Calculate the hedge stake that equalizes profit across two outcomes."""
+    if original_stake <= 0:
+        raise ValueError("Original stake must be greater than 0.")
+
+    validate_decimal(original_decimal_odds)
+    validate_decimal(hedge_decimal_odds)
+
+    original_total_return = original_stake * original_decimal_odds
+    return original_total_return / hedge_decimal_odds
+
+
+def stake_protection_hedge_amount(
+    original_stake: float,
+    hedge_decimal_odds: float,
+) -> float:
+    """Calculate the hedge stake that recovers the original stake if hedge wins."""
+    if original_stake <= 0:
+        raise ValueError("Original stake must be greater than 0.")
+
+    validate_decimal(hedge_decimal_odds)
+    return original_stake / (hedge_decimal_odds - 1)
+
+
+def hedge_outcome_profits(
+    original_stake: float,
+    original_decimal_odds: float,
+    hedge_stake: float,
+    hedge_decimal_odds: float,
+) -> tuple[float, float]:
+    """
+    Calculate net profit under either exclusive outcome.
+
+    Returns:
+        profit_if_original_wins
+        profit_if_hedge_wins
+    """
+    if original_stake <= 0:
+        raise ValueError("Original stake must be greater than 0.")
+
+    if hedge_stake < 0:
+        raise ValueError("Hedge stake cannot be negative.")
+
+    validate_decimal(original_decimal_odds)
+    validate_decimal(hedge_decimal_odds)
+
+    original_profit = (
+        original_stake * original_decimal_odds
+        - original_stake
+        - hedge_stake
     )
+
+    hedge_profit = (
+        hedge_stake * hedge_decimal_odds
+        - hedge_stake
+        - original_stake
+    )
+
+    return original_profit, hedge_profit
