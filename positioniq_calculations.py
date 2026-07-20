@@ -270,3 +270,188 @@ def probability_edge(
 def break_even_probability(decimal_odds: float) -> float:
     """Return the win rate required to break even at the listed odds."""
     return decimal_to_probability(decimal_odds)
+
+def fair_cashout_value(
+    total_payout: float,
+    current_win_probability_percent: float,
+) -> float:
+    """
+    Estimate the current fair value of an unsettled ticket.
+
+    Fair ticket value = probability of winning * total payout.
+    """
+    if total_payout <= 0:
+        raise ValueError("Total payout must be greater than 0.")
+
+    if (
+        current_win_probability_percent <= 0
+        or current_win_probability_percent >= 100
+    ):
+        raise ValueError(
+            "Current win probability must be greater than 0% "
+            "and less than 100%."
+        )
+
+    probability = current_win_probability_percent / 100
+    return total_payout * probability
+
+
+def cashout_break_even_probability(
+    cashout_offer: float,
+    total_payout: float,
+) -> float:
+    """
+    Return the win probability at which cashing out and continuing
+    have the same expected value.
+    """
+    if cashout_offer < 0:
+        raise ValueError("Cashout offer cannot be negative.")
+
+    if total_payout <= 0:
+        raise ValueError("Total payout must be greater than 0.")
+
+    return cashout_offer / total_payout * 100
+
+
+def cashout_value_difference(
+    cashout_offer: float,
+    fair_value: float,
+) -> float:
+    """
+    Return cashout offer minus estimated fair ticket value.
+
+    Positive values indicate an offer above estimated fair value.
+    Negative values indicate a discount below estimated fair value.
+    """
+    if cashout_offer < 0:
+        raise ValueError("Cashout offer cannot be negative.")
+
+    if fair_value < 0:
+        raise ValueError("Fair value cannot be negative.")
+
+    return cashout_offer - fair_value
+
+
+def cashout_offer_percentage(
+    cashout_offer: float,
+    fair_value: float,
+) -> float:
+    """Return the cashout offer as a percentage of estimated fair value."""
+    if cashout_offer < 0:
+        raise ValueError("Cashout offer cannot be negative.")
+
+    if fair_value <= 0:
+        raise ValueError("Fair value must be greater than 0.")
+
+    return cashout_offer / fair_value * 100
+
+def combine_independent_probabilities(
+    probabilities_percent: list[float],
+) -> float:
+    """
+    Combine independent leg probabilities into one parlay probability.
+
+    Each input is a percentage between 0 and 100.
+    """
+    if not probabilities_percent:
+        raise ValueError("Enter at least one probability.")
+
+    combined = 1.0
+
+    for probability_percent in probabilities_percent:
+        if probability_percent <= 0 or probability_percent >= 100:
+            raise ValueError(
+                "Every leg probability must be greater than 0% "
+                "and less than 100%."
+            )
+
+        combined *= probability_percent / 100
+
+    return combined * 100
+
+
+def combine_decimal_odds(
+    decimal_odds_values: list[float],
+) -> float:
+    """Multiply decimal odds for independent parlay legs."""
+    if not decimal_odds_values:
+        raise ValueError("Enter at least one set of odds.")
+
+    combined = 1.0
+
+    for decimal_odds in decimal_odds_values:
+        validate_decimal(decimal_odds)
+        combined *= decimal_odds
+
+    return combined
+
+
+def fair_decimal_odds_from_probability(
+    probability_percent: float,
+) -> float:
+    """Return fair decimal odds for a probability estimate."""
+    return probability_to_decimal(probability_percent)
+
+
+def parlay_final_leg_equal_profit_hedge(
+    total_ticket_payout: float,
+    hedge_decimal_odds: float,
+) -> float:
+    """
+    Calculate the opposing hedge needed to equalize profit when exactly
+    one two-way parlay leg remains.
+    """
+    if total_ticket_payout <= 0:
+        raise ValueError("Total ticket payout must be greater than 0.")
+
+    validate_decimal(hedge_decimal_odds)
+    return total_ticket_payout / hedge_decimal_odds
+
+
+def parlay_final_leg_outcomes(
+    original_stake: float,
+    total_ticket_payout: float,
+    hedge_stake: float,
+    hedge_decimal_odds: float,
+) -> tuple[float, float]:
+    """
+    Return net profits if the parlay wins or the opposing hedge wins.
+    """
+    if original_stake <= 0:
+        raise ValueError("Original stake must be greater than 0.")
+
+    if total_ticket_payout <= 0:
+        raise ValueError("Total ticket payout must be greater than 0.")
+
+    if hedge_stake < 0:
+        raise ValueError("Hedge stake cannot be negative.")
+
+    validate_decimal(hedge_decimal_odds)
+
+    parlay_win_profit = total_ticket_payout - original_stake - hedge_stake
+    hedge_win_profit = (
+        hedge_stake * hedge_decimal_odds
+        - hedge_stake
+        - original_stake
+    )
+
+    return parlay_win_profit, hedge_win_profit
+
+def relative_price_difference_percent(
+    offered_decimal_odds: float,
+    reference_decimal_odds: float,
+) -> float:
+    """
+    Compare an offered decimal price with a reference decimal price.
+
+    Positive values mean the offered price pays more than the reference.
+    """
+    validate_decimal(offered_decimal_odds)
+    validate_decimal(reference_decimal_odds)
+
+    return (
+        (offered_decimal_odds - reference_decimal_odds)
+        / reference_decimal_odds
+        * 100
+    )
+
