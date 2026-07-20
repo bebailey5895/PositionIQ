@@ -1,3 +1,5 @@
+import json
+
 import streamlit as st
 
 from positioniq_calculations import (
@@ -407,6 +409,10 @@ with st.sidebar:
     )
 
 advanced_mode = experience_level == "Advanced"
+
+
+if "parlay_workspace" not in st.session_state:
+    st.session_state.parlay_workspace = None
 
 
 home_tab, converter_tab, no_vig_tab, hedge_tab, ev_tab, cashout_tab, parlay_tab = st.tabs(
@@ -2324,6 +2330,38 @@ with parlay_tab:
         "with its component prices, and evaluate an active ticket."
     )
 
+
+    if st.session_state.parlay_workspace:
+        workspace = st.session_state.parlay_workspace
+
+        with st.container(border=True):
+            st.markdown("#### Active Parlay Workspace")
+            st.write(
+                f"**{workspace['ticket_name']}** · "
+                f"{workspace['event_count']} events · "
+                f"{workspace['total_selections']} selections"
+            )
+            st.caption(
+                f"Stake: ${workspace['stake']:,.2f} · "
+                f"Original odds: {workspace['offered_american']:+.0f} · "
+                f"Potential payout: ${workspace['offered_total_return']:,.2f}"
+            )
+
+            clear_workspace = st.button(
+                "Clear saved workspace",
+                key="clear_parlay_workspace",
+            )
+
+            if clear_workspace:
+                st.session_state.parlay_workspace = None
+                st.rerun()
+    else:
+        st.caption(
+            "Build a ticket below and save it to the workspace. The saved "
+            "stake, original price, payout, and event structure will carry "
+            "into the live, line-movement, and hedge tools."
+        )
+
     builder_tab, live_tab, line_movement_tab, final_leg_tab = st.tabs(
         [
             "Ticket Builder",
@@ -2348,6 +2386,20 @@ with parlay_tab:
         )
 
         try:
+            ticket_name = st.text_input(
+                "Ticket name",
+                value="",
+                placeholder="Example: World Cup futures parlay",
+                key="v12_ticket_name",
+            ).strip() or "Untitled parlay"
+
+            sportsbook_name = st.text_input(
+                "Sportsbook (optional)",
+                value="",
+                placeholder="Example: DraftKings",
+                key="v12_sportsbook_name",
+            ).strip()
+
             ticket_col1, ticket_col2 = st.columns(2)
 
             with ticket_col1:
@@ -3002,6 +3054,59 @@ with parlay_tab:
                 ),
             )
 
+            workspace_payload = {
+                "ticket_name": ticket_name,
+                "sportsbook": sportsbook_name,
+                "stake": float(parlay_stake),
+                "event_count": int(event_count),
+                "total_selections": int(total_selections),
+                "same_game_groups": int(sgp_group_count),
+                "standalone_selections": int(standalone_count),
+                "offered_decimal": float(offered_ticket_decimal),
+                "offered_american": float(
+                    decimal_to_american(offered_ticket_decimal)
+                ),
+                "offered_total_return": float(offered_total_return),
+                "synthetic_decimal": float(synthetic_decimal),
+                "synthetic_american": float(synthetic_american),
+                "synthetic_probability": float(synthetic_probability),
+                "event_groups": event_rows,
+            }
+
+            workspace_col1, workspace_col2 = st.columns(2)
+
+            with workspace_col1:
+                if st.button(
+                    "Save ticket to Parlay Workspace",
+                    type="primary",
+                    key="save_parlay_workspace",
+                ):
+                    st.session_state.parlay_workspace = workspace_payload
+                    st.success(
+                        "Ticket saved. Its core details now carry into the "
+                        "other Parlay Lab tools."
+                    )
+
+            with workspace_col2:
+                export_json = json.dumps(
+                    workspace_payload,
+                    indent=2,
+                )
+
+                st.download_button(
+                    "Download ticket JSON",
+                    data=export_json,
+                    file_name="positioniq_parlay_ticket.json",
+                    mime="application/json",
+                    key="download_parlay_json",
+                )
+
+            st.caption(
+                "The workspace stores the ticket for the current browser "
+                "session. The JSON download can be kept and imported in a "
+                "future persistence release."
+            )
+
             with st.expander("How PositionIQ handled this ticket", expanded=advanced_mode):
                 st.markdown(
                     """
@@ -3031,6 +3136,10 @@ with parlay_tab:
     with live_tab:
         st.subheader("Live Ticket and Cashout")
 
+        if st.session_state.parlay_workspace:
+            st.success("Saved workspace values prefill the original stake, payout, and event count.")
+
+
         st.caption(
             "Recreate only the remaining uncertainty. Won events no longer "
             "reduce the ticket's chance of finishing; lost events make the "
@@ -3045,7 +3154,11 @@ with parlay_tab:
                 live_original_stake = st.number_input(
                     "Original ticket stake ($)",
                     min_value=0.01,
-                    value=25.00,
+                    value=(
+                        float(st.session_state.parlay_workspace["stake"])
+                        if st.session_state.parlay_workspace
+                        else 25.00
+                    ),
                     step=5.00,
                     format="%.2f",
                     key="v08_live_stake",
@@ -3055,7 +3168,15 @@ with parlay_tab:
                 live_total_payout = st.number_input(
                     "Current total payout if ticket wins ($)",
                     min_value=0.01,
-                    value=500.00,
+                    value=(
+                        float(
+                            st.session_state.parlay_workspace[
+                                "offered_total_return"
+                            ]
+                        )
+                        if st.session_state.parlay_workspace
+                        else 500.00
+                    ),
                     step=25.00,
                     format="%.2f",
                     key="v08_live_total_payout",
@@ -3079,7 +3200,11 @@ with parlay_tab:
                 "Number of events on the original ticket",
                 min_value=1,
                 max_value=8,
-                value=3,
+                value=(
+                    int(st.session_state.parlay_workspace["event_count"])
+                    if st.session_state.parlay_workspace
+                    else 3
+                ),
                 step=1,
                 key="v08_live_event_count",
             )
@@ -3583,6 +3708,10 @@ with parlay_tab:
     with line_movement_tab:
         st.subheader("Parlay Line Movement and CLV")
 
+        if st.session_state.parlay_workspace:
+            st.success("Saved workspace values prefill the original ticket price and stake.")
+
+
         render_tool_intro(
             "Did I lock in a better or worse price than the market offers now?",
             "Compare the exact same ticket at two different times. The ticket "
@@ -3615,7 +3744,17 @@ with parlay_tab:
                 with clv_col1:
                     original_line_input = st.number_input(
                         "Original ticket odds",
-                        value=7500,
+                        value=(
+                            int(
+                                round(
+                                    st.session_state.parlay_workspace[
+                                        "offered_american"
+                                    ]
+                                )
+                            )
+                            if st.session_state.parlay_workspace
+                            else 7500
+                        ),
                         step=50,
                         key="clv_original_american",
                     )
@@ -3690,7 +3829,11 @@ with parlay_tab:
             clv_stake = st.number_input(
                 "Original stake ($)",
                 min_value=0.01,
-                value=100.00,
+                value=(
+                    float(st.session_state.parlay_workspace["stake"])
+                    if st.session_state.parlay_workspace
+                    else 100.00
+                ),
                 step=10.00,
                 format="%.2f",
                 key="clv_stake",
@@ -3898,6 +4041,10 @@ with parlay_tab:
     with final_leg_tab:
         st.subheader("Final-Leg Parlay Hedge")
 
+        if st.session_state.parlay_workspace:
+            st.success("Saved workspace values prefill the original stake and total payout.")
+
+
         st.warning(
             "Use this only when exactly one two-way event group remains and "
             "the hedge outcome is the exact opposite of the remaining ticket "
@@ -3912,7 +4059,11 @@ with parlay_tab:
                 final_original_stake = st.number_input(
                     "Original parlay stake ($)",
                     min_value=0.01,
-                    value=25.00,
+                    value=(
+                        float(st.session_state.parlay_workspace["stake"])
+                        if st.session_state.parlay_workspace
+                        else 25.00
+                    ),
                     step=5.00,
                     format="%.2f",
                     key="v08_final_original_stake",
@@ -3922,7 +4073,15 @@ with parlay_tab:
                 final_total_payout = st.number_input(
                     "Total parlay payout if final event wins ($)",
                     min_value=0.01,
-                    value=500.00,
+                    value=(
+                        float(
+                            st.session_state.parlay_workspace[
+                                "offered_total_return"
+                            ]
+                        )
+                        if st.session_state.parlay_workspace
+                        else 500.00
+                    ),
                     step=25.00,
                     format="%.2f",
                     key="v08_final_total_payout",
@@ -4084,6 +4243,6 @@ with parlay_tab:
 
 st.divider()
 st.caption(
-    "PositionIQ v0.11 — Functional Beginner and Advanced modes, a decision-"
-    "based home page, and mode-aware explanations and methodology."
+    "PositionIQ v0.12 — Shared Parlay Workspace, ticket export, and "
+    "cross-tool prefilling for live valuation, CLV, and hedge analysis."
 )
