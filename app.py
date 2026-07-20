@@ -7,9 +7,12 @@ from positioniq_calculations import (
     decimal_to_american,
     decimal_to_fractional,
     decimal_to_probability,
+    expected_value,
+    expected_value_percent,
     fractional_to_decimal,
     full_hedge_amount,
     hedge_outcome_profits,
+    probability_edge,
     probability_to_decimal,
     remove_vig_three_way,
     remove_vig_two_way,
@@ -69,6 +72,51 @@ def get_margin_rating(
     )
 
 
+def get_ev_rating(
+    ev_percent: float,
+) -> tuple[str, str, str]:
+    if ev_percent >= 10:
+        return (
+            "🟢",
+            "Strong Positive EV",
+            "Your estimate implies a substantial theoretical edge.",
+        )
+
+    if ev_percent >= 3:
+        return (
+            "🟢",
+            "Positive EV",
+            "Your estimate implies a potentially favorable wager.",
+        )
+
+    if ev_percent > 0:
+        return (
+            "🟡",
+            "Small Positive EV",
+            "The estimated edge is positive but relatively narrow.",
+        )
+
+    if abs(ev_percent) < 0.01:
+        return (
+            "⚪",
+            "Approximately Break-Even",
+            "Your estimate is close to the listed break-even probability.",
+        )
+
+    if ev_percent > -5:
+        return (
+            "🟠",
+            "Negative EV",
+            "Your estimate suggests the listed price is unfavorable.",
+        )
+
+    return (
+        "🔴",
+        "Strong Negative EV",
+        "Your estimate implies a substantial theoretical disadvantage.",
+    )
+
+
 def convert_input_to_decimal(
     odds_format: str,
     value: float | str,
@@ -115,40 +163,6 @@ def display_market_context(
             f"{market_margin:.2f}%."
         )
 
-    st.markdown("#### PositionIQ Insight")
-
-    if market_margin < 0:
-        st.success(
-            "These prices may represent an arbitrage-style opportunity. "
-            "Confirm every possible outcome is covered and all prices remain "
-            "available before acting."
-        )
-    elif market_margin < 2:
-        st.success(
-            "This market is priced very competitively. Small price "
-            "differences can become meaningful across many wagers."
-        )
-    elif market_margin < 4:
-        st.info(
-            "This market has relatively competitive pricing. Comparing "
-            "multiple sportsbooks may still uncover a better price."
-        )
-    elif market_margin < 6:
-        st.info(
-            "This is a common sportsbook pricing range. A standard "
-            "-110/-110 market contains approximately 4.76% overround."
-        )
-    elif market_margin < 8:
-        st.warning(
-            "This market is more expensive than many standard markets. "
-            "Consider comparing prices elsewhere."
-        )
-    else:
-        st.error(
-            "This is a high-margin market. Props, futures, and same-game "
-            "parlays often contain larger pricing margins."
-        )
-
     with st.expander("What does this mean?"):
         st.markdown(
             f"""
@@ -159,36 +173,6 @@ def display_market_context(
             A complete set of mutually exclusive outcomes should total 100%.
             Any amount above 100% is estimated overround. PositionIQ removes
             it proportionally to estimate fair no-vig prices.
-
-            **General guide**
-
-            - Under 2%: Very low
-            - 2% to 4%: Competitive
-            - 4% to 6%: Typical
-            - 6% to 8%: Expensive
-            - Above 8%: Very expensive
-            """
-        )
-
-    with st.expander(
-        "Useful details bettors often overlook",
-        expanded=False,
-    ):
-        st.markdown(
-            """
-            **Overround is not actual sportsbook hold.** Actual hold depends
-            on how wagers are distributed and settled.
-
-            **No-vig odds are not predictions.** They estimate market prices
-            after removing the listed margin.
-
-            **Small differences matter.** Moving from -115 to -110 or +120
-            to +125 can materially affect long-run results.
-
-            **Market definitions matter.** A soccer three-way market covers
-            home win, draw, and away win in regulation. A two-way
-            qualification market covers which team advances, including extra
-            time and penalties according to the sportsbook's rules.
             """
         )
 
@@ -196,11 +180,12 @@ def display_market_context(
 st.title("PositionIQ")
 st.caption("Understand every possible outcome.")
 
-converter_tab, no_vig_tab, hedge_tab = st.tabs(
+converter_tab, no_vig_tab, hedge_tab, ev_tab = st.tabs(
     [
         "Odds Converter",
         "No-Vig Calculator",
         "Hedge Calculator",
+        "EV Calculator",
     ]
 )
 
@@ -698,24 +683,9 @@ with no_vig_tab:
             result_a, result_draw, result_b = st.columns(3)
 
             results = [
-                (
-                    result_a,
-                    side_a_name,
-                    raw_a,
-                    fair_a,
-                ),
-                (
-                    result_draw,
-                    draw_name,
-                    raw_draw,
-                    fair_draw,
-                ),
-                (
-                    result_b,
-                    side_b_name,
-                    raw_b,
-                    fair_b,
-                ),
+                (result_a, side_a_name, raw_a, fair_a),
+                (result_draw, draw_name, raw_draw, fair_draw),
+                (result_b, side_b_name, raw_b, fair_b),
             ]
 
             for column, name, raw_probability, fair_probability in results:
@@ -768,21 +738,9 @@ with hedge_tab:
             """
             Hedging is similar to buying insurance on an existing wager.
 
-            Suppose you placed a $100 wager on Team A at +500. That wager
-            could return $600, but Team B later becomes available at a price
-            that lets you protect part of your position.
-
-            You could place a second wager on Team B. This lowers what you
-            would win if Team A succeeds, but it gives you money back if
-            Team B wins.
-
-            People commonly hedge to:
-
-            - Lock in guaranteed profit
-            - Recover their original stake
-            - Reduce exposure on a large wager
-            - Protect a parlay before the final leg
-            - Avoid risking an amount they are no longer comfortable losing
+            People commonly hedge to lock in profit, recover their original
+            stake, reduce exposure, protect a parlay before its final leg, or
+            avoid risking an amount they are no longer comfortable losing.
 
             Hedging is optional. Letting the original wager ride preserves
             the highest possible upside.
@@ -964,22 +922,17 @@ with hedge_tab:
 
         if strategy == "Lock in the same profit either way":
             hedge_stake = equal_hedge
-
         elif strategy == "Get my original stake back if the hedge wins":
             hedge_stake = stake_protection_hedge_amount(
                 original_stake,
                 hedge_decimal,
             )
-
         elif strategy == "Hedge most of the risk":
             hedge_stake = equal_hedge * 0.75
-
         elif strategy == "Hedge half of the risk":
             hedge_stake = equal_hedge * 0.50
-
         elif strategy == "Hedge a small portion":
             hedge_stake = equal_hedge * 0.25
-
         else:
             hedge_stake = st.number_input(
                 "Custom hedge amount ($)",
@@ -1026,10 +979,6 @@ with hedge_tab:
         recommendation_col3.metric(
             "Original upside given up",
             f"${upside_given_up:,.2f}",
-            help=(
-                "This is how much less you would profit if the original "
-                "wager wins after placing the hedge."
-            ),
         )
 
         st.subheader("After hedging")
@@ -1050,61 +999,19 @@ with hedge_tab:
                 f"${profit_hedge:,.2f}",
             )
 
-        st.subheader("What this hedge does")
-
-        if strategy == "Lock in the same profit either way":
-            st.success(
-                "This strategy gives you approximately the same net result "
-                "regardless of which wager wins."
-            )
-
-        elif strategy == "Get my original stake back if the hedge wins":
-            st.info(
-                "This strategy aims to recover your original stake if the "
-                "hedge wins while preserving more upside on the original "
-                "wager."
-            )
-
-        elif strategy == "Hedge most of the risk":
-            st.info(
-                "This substantially reduces your downside while preserving "
-                "more profit if the original wager wins."
-            )
-
-        elif strategy == "Hedge half of the risk":
-            st.info(
-                "This balances protection and upside. It reduces risk "
-                "without fully equalizing the two outcomes."
-            )
-
-        elif strategy == "Hedge a small portion":
-            st.info(
-                "This provides limited protection while keeping most of "
-                "the original wager's upside."
-            )
-
-        else:
-            st.info(
-                "This custom amount lets you choose your own balance "
-                "between protection and potential profit."
-            )
-
         if guaranteed_result > 0:
             st.success(
-                f"You are exchanging some upside for a guaranteed minimum "
-                f"net profit of ${guaranteed_result:,.2f}."
+                f"This setup guarantees at least "
+                f"${guaranteed_result:,.2f} in net profit."
             )
-
         elif abs(guaranteed_result) < 0.005:
             st.info(
-                "This setup approximately eliminates your worst-case loss "
-                "but does not guarantee additional profit."
+                "This setup approximately eliminates the worst-case loss."
             )
-
         else:
             st.warning(
-                f"This hedge reduces risk, but one outcome still produces "
-                f"a loss of ${abs(guaranteed_result):,.2f}."
+                f"One outcome still produces a loss of "
+                f"${abs(guaranteed_result):,.2f}."
             )
 
         with st.expander("What does this hedge trade off?"):
@@ -1114,42 +1021,11 @@ with hedge_tab:
                 - Selected hedge amount: **${hedge_stake:,.2f}**
                 - Profit if original wins: **${profit_original:,.2f}**
                 - Profit if hedge wins: **${profit_hedge:,.2f}**
-                - Original-wager upside given up:
+                - Original upside given up:
                   **${upside_given_up:,.2f}**
 
-                A larger hedge improves the hedge-side result but reduces
-                the original wager's upside. Hedging changes the distribution
-                of outcomes; it does not create value by itself.
-                """
-            )
-
-        with st.expander("Common situations where people hedge"):
-            st.markdown(
-                """
-                **Final leg of a parlay**
-
-                Earlier legs have won, and the remaining leg determines
-                whether the entire parlay pays.
-
-                **Futures wager**
-
-                A team reaches a championship or late tournament stage after
-                being backed at long odds.
-
-                **Live game movement**
-
-                The original wager has improved significantly, and the
-                opposing side is now available at a price that allows some
-                risk protection.
-
-                **The risk became uncomfortable**
-
-                The possible loss or payout is larger than the bettor is
-                comfortable leaving exposed.
-
-                **Important:** Hedging is not automatically the best
-                mathematical decision. It is primarily a risk-management
-                choice.
+                Hedging changes the distribution of outcomes; it does not
+                create value by itself.
                 """
             )
 
@@ -1163,8 +1039,281 @@ with hedge_tab:
         st.error(str(error))
 
 
+# =========================================================
+# EXPECTED VALUE CALCULATOR
+# =========================================================
+
+with ev_tab:
+    st.header("Expected Value Calculator")
+
+    st.info(
+        "Expected value estimates the average profit or loss you would expect "
+        "if the same wager could be repeated many times under the same odds "
+        "and probability assumptions."
+    )
+
+    with st.expander("What is expected value?"):
+        st.markdown(
+            """
+            A wager can lose today and still have positive expected value.
+            It can also win today while being a poor long-term wager.
+
+            Expected value compares:
+
+            - The sportsbook's price
+            - Your estimated probability of winning
+            - The amount you plan to risk
+
+            **Positive EV** means your probability estimate is high enough
+            to justify the listed price.
+
+            **Negative EV** means the listed payout is not large enough for
+            the probability you assigned.
+
+            Expected value depends completely on the quality of your
+            probability estimate. PositionIQ does not generate that estimate
+            for you in this version.
+            """
+        )
+
+    ev_format = st.selectbox(
+        "Odds format",
+        [
+            "American",
+            "Decimal",
+            "Fractional",
+            "Implied probability",
+        ],
+        key="ev_format",
+    )
+
+    try:
+        input_col1, input_col2 = st.columns(2)
+
+        with input_col1:
+            if ev_format == "American":
+                ev_odds_input = st.number_input(
+                    "Listed American odds",
+                    value=150,
+                    step=5,
+                    key="ev_american",
+                )
+            elif ev_format == "Decimal":
+                ev_odds_input = st.number_input(
+                    "Listed decimal odds",
+                    min_value=1.01,
+                    value=2.50,
+                    step=0.01,
+                    format="%.2f",
+                    key="ev_decimal",
+                )
+            elif ev_format == "Fractional":
+                ev_odds_input = st.text_input(
+                    "Listed fractional odds",
+                    value="3/2",
+                    key="ev_fractional",
+                )
+            else:
+                ev_odds_input = st.number_input(
+                    "Listed implied probability (%)",
+                    min_value=0.01,
+                    max_value=99.99,
+                    value=40.00,
+                    step=0.01,
+                    format="%.2f",
+                    key="ev_implied_probability",
+                )
+
+        with input_col2:
+            estimated_probability = st.number_input(
+                "Your estimated win probability (%)",
+                min_value=0.01,
+                max_value=99.99,
+                value=45.00,
+                step=0.25,
+                format="%.2f",
+                key="ev_user_probability",
+                help=(
+                    "This should be your independent estimate of how often "
+                    "the wager would win—not the sportsbook's listed implied "
+                    "probability."
+                ),
+            )
+
+        stake = st.number_input(
+            "Stake amount ($)",
+            min_value=0.01,
+            value=100.00,
+            step=10.00,
+            format="%.2f",
+            key="ev_stake",
+        )
+
+        ev_decimal_odds = convert_input_to_decimal(
+            ev_format,
+            ev_odds_input,
+        )
+
+        implied_probability = decimal_to_probability(
+        ev_decimal_odds
+        )
+
+        edge_percent = probability_edge(
+            ev_decimal_odds,
+            estimated_probability,
+        )
+
+        ev_dollars = expected_value(
+            stake,
+            ev_decimal_odds,
+            estimated_probability,
+        )
+
+        ev_percent = expected_value_percent(
+            ev_decimal_odds,
+            estimated_probability,
+        )
+
+        net_profit_if_win = calculate_profit(
+            stake,
+            ev_decimal_odds,
+        )
+
+        rating_icon, rating_label, rating_explanation = (
+            get_ev_rating(ev_percent)
+        )
+
+        st.divider()
+        st.subheader("Probability comparison")
+
+        probability_col1, probability_col2, probability_col3 = st.columns(3)
+
+        probability_col1.metric(
+            "Break-even probability",
+            f"{implied_probability:.2f}%",
+        )
+
+        probability_col2.metric(
+            "Your estimated probability",
+            f"{estimated_probability:.2f}%",
+        )
+
+        probability_col3.metric(
+            "Estimated probability edge",
+            f"{edge_percent:+.2f} pts",
+            help=(
+                "Your probability estimate minus the listed break-even "
+                "probability."
+            ),
+        )
+
+        st.subheader("Expected value results")
+
+        result_col1, result_col2, result_col3 = st.columns(3)
+
+        result_col1.metric(
+            "Expected value per wager",
+            f"${ev_dollars:+,.2f}",
+        )
+
+        result_col2.metric(
+            "Expected ROI",
+            f"{ev_percent:+.2f}%",
+        )
+
+        result_col3.metric(
+            "Profit if wager wins",
+            f"${net_profit_if_win:,.2f}",
+        )
+
+        st.markdown("### PositionIQ EV Rating")
+
+        with st.container(border=True):
+            st.markdown(f"## {rating_icon} {rating_label}")
+            st.write(rating_explanation)
+
+        if ev_percent > 0:
+            st.success(
+                f"Based on your {estimated_probability:.2f}% probability "
+                f"estimate, this wager has positive expected value of "
+                f"${ev_dollars:,.2f} per ${stake:,.2f} wager."
+            )
+        elif abs(ev_percent) < 0.01:
+            st.info(
+                "Based on your estimate, this wager is approximately "
+                "break-even before considering limits, errors, or changing "
+                "market conditions."
+            )
+        else:
+            st.warning(
+                f"Based on your {estimated_probability:.2f}% probability "
+                f"estimate, this wager has negative expected value of "
+                f"${abs(ev_dollars):,.2f} per ${stake:,.2f} wager."
+            )
+
+        with st.expander("How was this calculated?"):
+            st.markdown(
+                f"""
+                **Listed decimal odds:** {ev_decimal_odds:.4f}
+
+                **Break-even probability:** {implied_probability:.2f}%
+
+                **Your estimated probability:** {estimated_probability:.2f}%
+
+                **Probability edge:** {edge_percent:+.2f} percentage points
+
+                **Expected value per wager:** ${ev_dollars:+,.2f}
+
+                **Expected ROI:** {ev_percent:+.2f}%
+
+                Expected value weighs the possible profit by your estimated
+                chance of winning and subtracts the possible loss weighted by
+                your estimated chance of losing.
+                """
+            )
+
+        with st.expander("Important limitations"):
+            st.markdown(
+                """
+                **Your probability estimate drives the result**
+
+                Entering an overly optimistic probability will make almost
+                any wager appear profitable.
+
+                **Positive EV does not guarantee a win**
+
+                Even a strong positive-EV wager can lose. EV describes an
+                average across many comparable wagers.
+
+                **Small edges are fragile**
+
+                A small error in your probability estimate can erase a narrow
+                edge.
+
+                **Market odds can change**
+
+                Expected value should be recalculated when the available price
+                moves.
+
+                **This version does not remove vig automatically**
+
+                For a market-based probability estimate, use the no-vig
+                calculator first and then compare that probability with the
+                offered odds.
+                """
+            )
+
+        st.caption(
+            "For educational and analytical purposes. PositionIQ does not "
+            "predict outcomes or guarantee profitability."
+        )
+
+    except ValueError as error:
+        st.error(str(error))
+
+
 st.divider()
 st.caption(
-    "PositionIQ v0.4 — Odds conversion, two-way and three-way no-vig "
-    "analysis, and two-outcome hedge calculations."
+    "PositionIQ v0.5 — Odds conversion, two-way and three-way no-vig "
+    "analysis, hedge calculations, and expected value analysis."
 )

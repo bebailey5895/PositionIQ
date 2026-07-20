@@ -107,12 +107,7 @@ def remove_vig_two_way(
     decimal_odds_a: float,
     decimal_odds_b: float,
 ) -> tuple[float, float, float]:
-    """
-    Remove vig proportionally from a two-outcome market.
-
-    Returns fair probabilities for A and B, plus market overround.
-    All returned values are percentages.
-    """
+    """Remove vig proportionally from a two-outcome market."""
     validate_decimal(decimal_odds_a)
     validate_decimal(decimal_odds_b)
 
@@ -132,12 +127,7 @@ def remove_vig_three_way(
     decimal_odds_draw: float,
     decimal_odds_b: float,
 ) -> tuple[float, float, float, float]:
-    """
-    Remove vig proportionally from a three-outcome market.
-
-    Returns fair probabilities for A, draw, and B, plus market overround.
-    All returned values are percentages.
-    """
+    """Remove vig proportionally from a three-outcome market."""
     validate_decimal(decimal_odds_a)
     validate_decimal(decimal_odds_draw)
     validate_decimal(decimal_odds_b)
@@ -175,7 +165,7 @@ def stake_protection_hedge_amount(
     original_stake: float,
     hedge_decimal_odds: float,
 ) -> float:
-    """Calculate the hedge stake that recovers the original stake if hedge wins."""
+    """Calculate the hedge stake that recovers the original stake."""
     if original_stake <= 0:
         raise ValueError("Original stake must be greater than 0.")
 
@@ -189,13 +179,7 @@ def hedge_outcome_profits(
     hedge_stake: float,
     hedge_decimal_odds: float,
 ) -> tuple[float, float]:
-    """
-    Calculate net profit under either exclusive outcome.
-
-    Returns:
-        profit_if_original_wins
-        profit_if_hedge_wins
-    """
+    """Calculate net profit under either exclusive outcome."""
     if original_stake <= 0:
         raise ValueError("Original stake must be greater than 0.")
 
@@ -218,3 +202,71 @@ def hedge_outcome_profits(
     )
 
     return original_profit, hedge_profit
+
+
+def expected_value(
+    stake: float,
+    decimal_odds: float,
+    estimated_probability_percent: float,
+) -> float:
+    """
+    Calculate expected profit or loss per wager in currency units.
+
+    EV = p(win) * net_win - p(loss) * stake
+    """
+    if stake <= 0:
+        raise ValueError("Stake must be greater than 0.")
+
+    validate_decimal(decimal_odds)
+
+    if (
+        estimated_probability_percent <= 0
+        or estimated_probability_percent >= 100
+    ):
+        raise ValueError(
+            "Estimated probability must be greater than 0% "
+            "and less than 100%."
+        )
+
+    win_probability = estimated_probability_percent / 100
+    loss_probability = 1 - win_probability
+    net_win = stake * (decimal_odds - 1)
+
+    return (
+        win_probability * net_win
+        - loss_probability * stake
+    )
+
+
+def expected_value_percent(
+    decimal_odds: float,
+    estimated_probability_percent: float,
+) -> float:
+    """Calculate expected value as a percentage of stake."""
+    validate_decimal(decimal_odds)
+
+    if (
+        estimated_probability_percent <= 0
+        or estimated_probability_percent >= 100
+    ):
+        raise ValueError(
+            "Estimated probability must be greater than 0% "
+            "and less than 100%."
+        )
+
+    probability = estimated_probability_percent / 100
+    return ((probability * decimal_odds) - 1) * 100
+
+
+def probability_edge(
+    decimal_odds: float,
+    estimated_probability_percent: float,
+) -> float:
+    """Return estimated probability minus sportsbook implied probability."""
+    implied_probability = decimal_to_probability(decimal_odds)
+    return estimated_probability_percent - implied_probability
+
+
+def break_even_probability(decimal_odds: float) -> float:
+    """Return the win rate required to break even at the listed odds."""
+    return decimal_to_probability(decimal_odds)
